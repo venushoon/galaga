@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>구구단 갤러그 마스터</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        :root {
+            --bg-color: #000;
+            --primary-color: #00ffff;
+            --accent-color: #ff003c;
+            --key-bg: #333;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: #fff;
+            font-family: 'Press Start 2P', cursive;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        /* 메인 컨테이너: 다인용 모드를 고려한 유연한 구조 */
+        #game-wrapper {
+            display: flex;
+            width: 100vw;
+            height: 100vh;
+            max-width: 1600px;
+            background: #050505;
+        }
+
+        /* 플레이어별 레인 */
+        .player-lane {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #222;
+            position: relative;
+        }
+
+        .player-lane:last-child { border-right: none; }
+
+        /* 상단 게임 화면 */
+        .game-screen {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(to bottom, #000 0%, #0a0a1a 100%);
+        }
+
+        .hud {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            z-index: 20;
+            pointer-events: none;
+        }
+
+        .lives-container {
+            display: flex;
+            gap: 5px;
+            color: var(--accent-color);
+        }
+
+        /* 적군 및 플레이어 */
+        .enemy {
+            position: absolute;
+            width: 70px;
+            height: 35px;
+            border: 2px solid var(--primary-color);
+            background: rgba(0, 255, 255, 0.1);
+            color: var(--primary-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            border-radius: 4px;
+            transform: translateX(-50%);
+            box-shadow: 0 0 8px var(--primary-color);
+        }
+
+        .player-ship {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 24px;
+            transition: transform 0.1s;
+        }
+
+        /* 하단 컨트롤러 */
+        .controller {
+            height: 240px;
+            background: #111;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            border-top: 2px solid #333;
+        }
+
+        .display-area {
+            height: 40px;
+            background: #000;
+            border: 1px solid #444;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            color: #0f0;
+        }
+
+        .keypad {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 5px;
+            flex: 1;
+        }
+
+        .key {
+            background: var(--key-bg);
+            border: none;
+            color: white;
+            font-family: inherit;
+            font-size: 14px;
+            border-radius: 4px;
+            box-shadow: 0 3px #000;
+        }
+
+        .key:active { transform: translateY(2px); box-shadow: 0 1px #000; }
+        .key.clr { background: #600; }
+        .key.fire { background: #0066cc; }
+
+        /* 오버레이 효과 */
+        .overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            text-align: center;
+        }
+
+        .countdown { font-size: 60px; color: yellow; }
+        
+        .setup-screen {
+            position: fixed;
+            inset: 0;
+            background: #000;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .setup-btn {
+            margin: 10px;
+            padding: 15px 30px;
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            font-family: inherit;
+            cursor: pointer;
+        }
+
+        .level-up-msg {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: yellow;
+            font-size: 20px;
+            animation: fadeOut 1s forwards;
+        }
+
+        @keyframes fadeOut {
+            0% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(1.5); }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="setup" class="setup-screen">
+        <h1 style="color: var(--primary-color); text-align: center;">GALAGA<br>MULTIPLIER</h1>
+        <p>인원수를 선택하세요</p>
+        <div>
+            <button class="setup-btn" onclick="initGame(1)">1인용</button>
+            <button class="setup-btn" onclick="initGame(2)">2인용</button>
+            <button class="setup-btn" onclick="initGame(3)">3인용</button>
+            <button class="setup-btn" onclick="initGame(4)">4인용</button>
+        </div>
+    </div>
+
+    <div id="game-wrapper"></div>
+
+<script>
+    const wrapper = document.getElementById('game-wrapper');
+    const setup = document.getElementById('setup');
+    
+    let players = [];
+    const AUDIO_CTX = new (window.AudioContext || window.webkitAudioContext)();
+
+    // 레트로 효과음 생성기
+    function playSound(type) {
+        const osc = AUDIO_CTX.createOscillator();
+        const gain = AUDIO_CTX.createGain();
+        osc.connect(gain);
+        gain.connect(AUDIO_CTX.destination);
+
+        if (type === 'correct') {
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(440, AUDIO_CTX.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(880, AUDIO_CTX.currentTime + 0.1);
+            gain.gain.setValueAtTime(0.1, AUDIO_CTX.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, AUDIO_CTX.currentTime + 0.2);
+        } else if (type === 'wrong') {
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(200, AUDIO_CTX.currentTime);
+            osc.frequency.linearRampToValueAtTime(50, AUDIO_CTX.currentTime + 0.3);
+            gain.gain.setValueAtTime(0.1, AUDIO_CTX.currentTime);
+            gain.gain.linearRampToValueAtTime(0.01, AUDIO_CTX.currentTime + 0.3);
+        } else if (type === 'level') {
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(523.25, AUDIO_CTX.currentTime); // C5
+            osc.frequency.setValueAtTime(659.25, AUDIO_CTX.currentTime + 0.1); // E5
+            osc.frequency.setValueAtTime(783.99, AUDIO_CTX.currentTime + 0.2); // G5
+            gain.gain.setValueAtTime(0.1, AUDIO_CTX.currentTime);
+            gain.gain.linearRampToValueAtTime(0, AUDIO_CTX.currentTime + 0.4);
+        }
+
+        osc.start();
+        osc.stop(AUDIO_CTX.currentTime + 0.4);
+    }
+
+    class Player {
+        constructor(id, parent) {
+            this.id = id;
+            this.score = 0;
+            this.level = 1;
+            this.lives = 3;
+            this.currentInput = "";
+            this.enemies = [];
+            this.isPlaying = false;
+            this.speed = 0.6;
+            
+            this.createDOM(parent);
+        }
+
+        createDOM(parent) {
+            this.lane = document.createElement('div');
+            this.lane.className = 'player-lane';
+            this.lane.innerHTML = `
+                <div class="game-screen" id="screen-${this.id}">
+                    <div class="hud">
+                        <div>P${this.id+1} SCORE:${this.score}</div>
+                        <div class="lives-container" id="lives-${this.id}">🚀🚀🚀</div>
+                    </div>
+                    <div class="player-ship" id="ship-${this.id}">🚀</div>
+                </div>
+                <div class="controller">
+                    <div class="display-area" id="disp-${this.id}"></div>
+                    <div class="keypad">
+                        ${[7,8,9,4,5,6,1,2,3].map(n => `<button class="key" onclick="players[${this.id}].input(${n})">${n}</button>`).join('')}
+                        <button class="key clr" onclick="players[${this.id}].clear()">C</button>
+                        <button class="key" onclick="players[${this.id}].input(0)">0</button>
+                        <button class="key fire" onclick="players[${this.id}].shoot()">FIRE</button>
+                    </div>
+                </div>
+                <div class="overlay" id="overlay-${this.id}">
+                    <div class="countdown" id="count-${this.id}">READY</div>
+                </div>
+            `;
+            parent.appendChild(this.lane);
+            
+            this.screen = document.getElementById(`screen-${this.id}`);
+            this.display = document.getElementById(`disp-${this.id}`);
+            this.overlay = document.getElementById(`overlay-${this.id}`);
+            this.countText = document.getElementById(`count-${this.id}`);
+            this.ship = document.getElementById(`ship-${this.id}`);
+        }
+
+        async start() {
+            // 카운트다운
+            for(let i=3; i>0; i--) {
+                this.countText.innerText = i;
+                await new Promise(r => setTimeout(r, 800));
+            }
+            this.countText.innerText = "START!";
+            await new Promise(r => setTimeout(r, 500));
+            this.overlay.classList.add('hidden');
+            this.overlay.style.display = 'none';
+            this.isPlaying = true;
+            this.spawnLoop();
+            this.update();
+        }
+
+        input(num) {
+            if(!this.isPlaying) return;
+            if(this.currentInput.length < 3) {
+                this.currentInput += num;
+                this.display.innerText = this.currentInput;
+            }
+        }
+
+        clear() {
+            this.currentInput = "";
+            this.display.innerText = "";
+        }
+
+        spawnLoop() {
+            if(!this.isPlaying) return;
+            this.spawnEnemy();
+            const delay = Math.max(1000, 3000 - (this.level * 200));
+            setTimeout(() => this.spawnLoop(), delay);
+        }
+
+        spawnEnemy() {
+            const n1 = Math.floor(Math.random() * 8) + 2;
+            const n2 = Math.floor(Math.random() * 9) + 1;
+            const enemy = {
+                ans: n1 * n2,
+                y: -40,
+                x: 20 + Math.random() * 60, // % 기준
+                el: document.createElement('div')
+            };
+            enemy.el.className = 'enemy';
+            enemy.el.innerText = `${n1}x${n2}`;
+            enemy.el.style.left = `${enemy.x}%`;
+            this.screen.appendChild(enemy.el);
+            this.enemies.push(enemy);
+        }
+
+        shoot() {
+            if(!this.isPlaying || !this.currentInput) return;
+            const val = parseInt(this.currentInput);
+            let hit = false;
+
+            for(let i=0; i<this.enemies.length; i++) {
+                if(this.enemies[i].ans === val) {
+                    this.destroyEnemy(i);
+                    hit = true;
+                    break; 
+                }
+            }
+
+            if(hit) {
+                playSound('correct');
+                this.score += 100;
+                this.checkLevelUp();
+            } else {
+                playSound('wrong');
+                this.reduceLife();
+            }
+            this.clear();
+        }
+
+        destroyEnemy(idx) {
+            const e = this.enemies[idx];
+            e.el.style.background = "white";
+            setTimeout(() => e.el.remove(), 100);
+            this.enemies.splice(idx, 1);
+        }
+
+        reduceLife() {
+            this.lives--;
+            document.getElementById(`lives-${this.id}`).innerText = "🚀".repeat(this.lives);
+            // 피격 흔들림 효과
+            this.ship.style.transform = "translateX(-50%) scale(1.5)";
+            setTimeout(() => this.ship.style.transform = "translateX(-50%) scale(1)", 200);
+
+            if(this.lives <= 0) this.gameOver();
+        }
+
+        checkLevelUp() {
+            const newLevel = Math.floor(this.score / 500) + 1;
+            if(newLevel > this.level) {
+                this.level = newLevel;
+                this.speed += 0.2;
+                playSound('level');
+                const msg = document.createElement('div');
+                msg.className = 'level-up-msg';
+                msg.innerText = `LEVEL ${this.level} UP!`;
+                this.screen.appendChild(msg);
+                setTimeout(() => msg.remove(), 1000);
+            }
+            this.lane.querySelector('.hud div').innerText = `P${this.id+1} SCORE:${this.score}`;
+        }
+
+        update() {
+            if(!this.isPlaying) return;
+            const h = this.screen.clientHeight;
+
+            for(let i=this.enemies.length-1; i>=0; i--) {
+                const e = this.enemies[i];
+                e.y += this.speed;
+                e.el.style.top = e.y + 'px';
+
+                if(e.y > h - 80) {
+                    this.destroyEnemy(i);
+                    this.reduceLife();
+                }
+            }
+            requestAnimationFrame(() => this.update());
+        }
+
+        gameOver() {
+            this.isPlaying = false;
+            this.overlay.style.display = 'flex';
+            this.overlay.innerHTML = `<h1>GAME OVER</h1><p>SCORE: ${this.score}</p><button class="setup-btn" onclick="location.reload()">RETRY</button>`;
+        }
+    }
+
+    function initGame(count) {
+        setup.style.display = 'none';
+        for(let i=0; i<count; i++) {
+            const p = new Player(i, wrapper);
+            players.push(p);
+            p.start();
+        }
+        // 오디오 컨텍스트 활성화 (브라우저 정책)
+        if (AUDIO_CTX.state === 'suspended') {
+            AUDIO_CTX.resume();
+        }
+    }
+</script>
+</body>
+</html>
