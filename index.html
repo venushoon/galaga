@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>구구단 갤러그 마스터</title>
+    <title>구구단 갤러그 마스터 v2.0</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
 
@@ -29,26 +29,27 @@
             font-family: 'Press Start 2P', cursive;
             height: 100vh;
             display: flex;
-            justify-content: center;
+            justify-content: center; /* 1인용 모드 시 가운데 정렬 */
             overflow: hidden;
         }
 
-        /* 메인 컨테이너: 다인용 모드를 고려한 유연한 구조 */
+        /* 메인 컨테이너 */
         #game-wrapper {
             display: flex;
             width: 100vw;
             height: 100vh;
-            max-width: 1600px;
+            max-width: 1600px; /* 대형 화면에서도 너무 커지지 않도록 제한 */
             background: #050505;
         }
 
-        /* 플레이어별 레인 */
+        /* 플레이어별 레인 (1인용 모드에서는 유일한 컨테이너) */
         .player-lane {
             flex: 1;
             display: flex;
             flex-direction: column;
             border-right: 1px solid #222;
             position: relative;
+            max-width: 500px; /* 대형 화면에서 한 손 조작성을 위한 최대 너비 제한 */
         }
 
         .player-lane:last-child { border-right: none; }
@@ -79,23 +80,34 @@
             color: var(--accent-color);
         }
 
-        /* 적군 및 플레이어 */
+        /* 적군 우주선 */
         .enemy {
             position: absolute;
-            width: 70px;
-            height: 35px;
-            border: 2px solid var(--primary-color);
-            background: rgba(0, 255, 255, 0.1);
-            color: var(--primary-color);
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
-            font-size: 10px;
-            border-radius: 4px;
             transform: translateX(-50%);
-            box-shadow: 0 0 8px var(--primary-color);
+            z-index: 10;
         }
 
+        .enemy-ship {
+            font-size: 24px;
+            color: var(--primary-color);
+            text-shadow: 0 0 5px var(--primary-color);
+        }
+
+        .enemy-problem {
+            position: absolute;
+            bottom: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 10px;
+            color: #ffcc00;
+            font-family: inherit;
+        }
+
+        /* 플레이어 우주선 */
         .player-ship {
             position: absolute;
             bottom: 20px;
@@ -103,6 +115,17 @@
             transform: translateX(-50%);
             font-size: 24px;
             transition: transform 0.1s;
+        }
+
+        /* 미사일 효과 */
+        .laser {
+            position: absolute;
+            width: 2px;
+            height: 15px;
+            background-color: var(--accent-color);
+            box-shadow: 0 0 5px var(--accent-color);
+            transition: all 0.15s linear; /* 미사일 속도 */
+            z-index: 10;
         }
 
         /* 하단 컨트롤러 */
@@ -192,6 +215,20 @@
             color: yellow;
             font-size: 20px;
             animation: fadeOut 1s forwards;
+        }
+
+        /* 폭발 효과 */
+        .explosion {
+            position: absolute;
+            font-size: 30px;
+            transform: translateX(-50%);
+            z-index: 15;
+            animation: explodeFade 0.2s forwards;
+        }
+
+        @keyframes explodeFade {
+            0% { transform: translateX(-50%) scale(0); opacity: 1; }
+            100% { transform: translateX(-50%) scale(1.5); opacity: 0; }
         }
 
         @keyframes fadeOut {
@@ -309,9 +346,15 @@
             }
             this.countText.innerText = "START!";
             await new Promise(r => setTimeout(r, 500));
-            this.overlay.classList.add('hidden');
             this.overlay.style.display = 'none';
             this.isPlaying = true;
+
+            // 초기 데이터 스폰 (image_1.png 데이터)
+            const initialProblems = [
+                {n1: 2, n2: 5}, {n1: 2, n2: 3}, {n1: 4, n2: 6}, {n1: 8, n2: 4}
+            ];
+            initialProblems.forEach(p => this.spawnEnemy(p.n1, p.n2));
+            
             this.spawnLoop();
             this.update();
         }
@@ -336,9 +379,10 @@
             setTimeout(() => this.spawnLoop(), delay);
         }
 
-        spawnEnemy() {
-            const n1 = Math.floor(Math.random() * 8) + 2;
-            const n2 = Math.floor(Math.random() * 9) + 1;
+        spawnEnemy(n1, n2) {
+            if(!n1) n1 = Math.floor(Math.random() * 8) + 2;
+            if(!n2) n2 = Math.floor(Math.random() * 9) + 1;
+            
             const enemy = {
                 ans: n1 * n2,
                 y: -40,
@@ -346,8 +390,15 @@
                 el: document.createElement('div')
             };
             enemy.el.className = 'enemy';
-            enemy.el.innerText = `${n1}x${n2}`;
             enemy.el.style.left = `${enemy.x}%`;
+            
+            // 레벨별 우주선 이모지 선택
+            const emojis = ['👾', '🛸', '🚀', '⭐'];
+            const emojiIndex = Math.min(this.level - 1, emojis.length - 1);
+            const enemyEmoji = emojis[emojiIndex];
+            
+            enemy.el.innerHTML = `<div class="enemy-ship">${enemyEmoji}</div><div class="enemy-problem">${n1}x${n2}</div>`;
+            
             this.screen.appendChild(enemy.el);
             this.enemies.push(enemy);
         }
@@ -355,19 +406,20 @@
         shoot() {
             if(!this.isPlaying || !this.currentInput) return;
             const val = parseInt(this.currentInput);
-            let hit = false;
+            let hitTarget = null;
 
             for(let i=0; i<this.enemies.length; i++) {
                 if(this.enemies[i].ans === val) {
-                    this.destroyEnemy(i);
-                    hit = true;
+                    hitTarget = this.enemies[i];
+                    this.enemies.splice(i, 1); // 배열에서 먼저 제거하여 중복 타격 방지
                     break; 
                 }
             }
 
-            if(hit) {
+            if(hitTarget) {
                 playSound('correct');
                 this.score += 100;
+                this.createLaser(hitTarget); // 미사일 효과 트리거
                 this.checkLevelUp();
             } else {
                 playSound('wrong');
@@ -376,16 +428,49 @@
             this.clear();
         }
 
-        destroyEnemy(idx) {
-            const e = this.enemies[idx];
-            e.el.style.background = "white";
-            setTimeout(() => e.el.remove(), 100);
-            this.enemies.splice(idx, 1);
+        createLaser(target) {
+            const laser = document.createElement('div');
+            laser.className = 'laser';
+            this.screen.appendChild(laser);
+
+            const targetY = target.y; // 타겟의 상단 y 좌표
+            const targetX = target.x; // 타겟의 중앙 x 좌표 (%)
+            const startX = this.screen.clientWidth / 2;
+            const startY = this.screen.clientHeight - 80;
+
+            // 레이저 위치 초기화
+            laser.style.top = startY + 'px';
+            laser.style.left = startX + 'px';
+
+            // CSS Transition을 사용하여 레이저 이동
+            setTimeout(() => {
+                laser.style.top = targetY + 'px';
+                laser.style.left = target.el.offsetLeft + 'px'; // offsetLeft 사용
+            }, 10);
+
+            // 도착 후 레이저 제거 및 폭발 효과
+            setTimeout(() => {
+                laser.remove();
+                this.triggerExplosion(target);
+            }, 150); // 미사일 속도 (Transition 시간과 동일하게 설정)
+        }
+
+        triggerExplosion(target) {
+            const explosion = document.createElement('div');
+            explosion.className = 'explosion';
+            explosion.innerText = '💥';
+            explosion.style.top = target.y + 'px';
+            explosion.style.left = target.el.offsetLeft + 'px';
+            this.screen.appendChild(explosion);
+            
+            target.el.remove(); // 적 우주선 제거
+
+            setTimeout(() => explosion.remove(), 200); // 폭발 지속 시간
         }
 
         reduceLife() {
             this.lives--;
-            document.getElementById(`lives-${this.id}`).innerText = "🚀".repeat(this.lives);
+            document.getElementById(`lives-${this.id}`).innerText = "🚀".repeat(Math.max(0, this.lives));
             // 피격 흔들림 효과
             this.ship.style.transform = "translateX(-50%) scale(1.5)";
             setTimeout(() => this.ship.style.transform = "translateX(-50%) scale(1)", 200);
@@ -418,8 +503,11 @@
                 e.el.style.top = e.y + 'px';
 
                 if(e.y > h - 80) {
-                    this.destroyEnemy(i);
-                    this.reduceLife();
+                    this.reduceLife(); // 먼저 생명 차감
+                    
+                    // 폭발 효과 없이 바로 제거
+                    e.el.remove();
+                    this.enemies.splice(i, 1);
                 }
             }
             requestAnimationFrame(() => this.update());
